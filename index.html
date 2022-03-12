@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>T. Briggs - Week 7 Activity</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        .label{
+            font-size: x-small;
+            font-family: sans-serif;
+        }
+        circle{
+            fill-opacity: .9;
+        }
+        line{
+            stroke:#909090;
+            stroke-opacity:0.6;
+        }
+        .inactive{
+            opacity: .1;
+        }
+        </style>
+</head>
+<body>
+<div style="text-align: center;">
+<h1>T. Briggs - CIS568 - Week 7</h1>
+<p>Note: Papers with no publisher are excluded.</p>
+</div>
+<svg width="100vw" height="70vh" viewBox="0 0 1000 800">
+</svg>
+<script>
+    d3.json("publisher_network.json").then(function (data){
+        nodes = data.nodes
+        links = data.links
+
+        const minRadius = 5;
+        const maxRadius = 50;
+
+        let nodeDegrees = d3.map(nodes, n => n.size)
+        let scale_radius = d3.scaleSqrt()
+            .domain(d3.extent(Object.values(nodeDegrees)))
+            .range([minRadius,maxRadius])
+
+        // Set the ids of the source and target on each link
+        for (let l = 0; l < links.length; l++)
+        {
+            let src = links[l].source
+            let tgt = links[l].target
+
+            for (let i = 0; i < nodes.length; i++)
+            {
+                if (nodes[i].id === src)
+                {
+                    for (let j = 0; j < nodes.length; j++)
+                    {
+                        if (nodes[j].id === tgt)
+                        {
+                            links[l].source = i;
+                            links[l].target = j;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        let scale_link_stroke_width = d3.scaleLinear()
+            .domain(d3.extent(data.links,function (d){return d.weight}))
+            .range([1,4])
+
+        let nodeIds = d3.map(nodes, n => n.id)
+        let color = d3.scaleSequential()
+            .interpolator(d3.interpolateTurbo)
+            .domain(d3.extent(Object.values(nodeIds)))
+
+        let svg = d3.select('svg')
+        let width = parseInt(svg.attr("viewBox").split(' ')[2])
+        let height = parseInt(svg.attr("viewBox").split(' ')[3])
+
+        // create links between publishers
+        let link_elements = svg.append("g")
+            .attr('transform',`translate(${width/2},${height/2})`)
+            .attr("stroke", "#999")
+            .attr("stroke-opacity", 0.6)
+            .selectAll(".line")
+            .data(links)
+            .enter()
+            .append("line")
+            .style("stroke-width", function (d){
+                return scale_link_stroke_width(d.weight)
+            })
+
+        // create nodes for publishers
+        let node_elements = svg.append("g")
+            .attr('transform',`translate(${width/2},${height/2})`)
+            .selectAll(".circle")
+            .data(nodes)
+            .enter()
+            .append("g")
+            .attr("id", function(d) {return "nodeid_" + d.id})
+            .on("mouseenter",function (d,data){
+                // Turn everything off
+                node_elements.classed("inactive",true)
+                link_elements.classed("inactive",true)
+
+                // Turn the node we're in back on
+                d3.select("#nodeid_" + data.id)
+                    .classed("inactive", false)
+
+                // Turn everything connected to this node back on
+                d3.selectAll(".connectedTo_" + data.id)
+                    .classed("inactive", false)
+            })
+            .on("mouseleave",function (d,data){
+                d3.selectAll(".inactive").classed("inactive",false)
+            })
+        node_elements
+            .append("circle")
+            .attr("r", function (d,i) {
+                return scale_radius(nodeDegrees[i])
+            })
+            .attr("fill", "blue")
+            .attr("fill", function (d) { return color(d.id)
+            })
+
+        node_elements.append("text")
+            .attr("class","label")
+            .attr("text-anchor","middle")
+            .text(function (d){return d.name})
+
+        d3.forceSimulation(nodes)
+            .force("collide",
+                d3.forceCollide()
+                    //.radius(60)
+                    .radius(maxRadius * 1.2)
+            )
+            .force("x", d3.forceX())
+            .force("y", d3.forceY())
+            .force("charge", d3.forceManyBody())
+            .force("link", d3.forceLink(links))
+            .on("tick", ticked);
+
+        // Put classes on each nodes so we can select them according to
+        // what nodes they're connected to
+        links.forEach(link => {
+            d3.select("#nodeid_" + link.source.id)
+                .classed("connectedTo_" + link.target.id, true)
+            d3.select("#nodeid_" + link.target.id)
+                .classed("connectedTo_" + link.source.id, true)
+        })
+
+        // Put classes on each link so we can select them according to
+        // what nodes they're connected to
+        d3.selectAll("line")
+            .attr("class", function(d) { return "connectedTo_" + d.source.id + " connectedTo_" + d.target.id } )
+
+        function ticked() {
+        node_elements
+            .attr('transform', function(d){return `translate(${d.x},${d.y})`})
+
+        link_elements
+            .attr("x1",function(d){return d.source.x})
+            .attr("x2",function(d){return d.target.x})
+            .attr("y1",function(d){return d.source.y})
+            .attr("y2",function(d){return d.target.y})
+    }
+    })
+</script>
+
+</body>
+</html>
