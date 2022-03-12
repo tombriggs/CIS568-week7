@@ -42,27 +42,21 @@
             .range([minRadius,maxRadius])
 
         // Set the ids of the source and target on each link
-        for (let l = 0; l < links.length; l++)
-        {
-            let src = links[l].source
-            let tgt = links[l].target
+        links.forEach(link => {
+            let src = link.source
+            let tgt = link.target
 
-            for (let i = 0; i < nodes.length; i++)
+            const srcNode = nodes.findIndex(n => n.id === src)
+            const tgtNode = nodes.findIndex(n => n.id === tgt)
+
+            if (srcNode != -1 && tgtNode != -1)
             {
-                if (nodes[i].id === src)
-                {
-                    for (let j = 0; j < nodes.length; j++)
-                    {
-                        if (nodes[j].id === tgt)
-                        {
-                            links[l].source = i;
-                            links[l].target = j;
-                            break;
-                        }
-                    }
-                }
+                link.source = srcNode
+                link.target = tgtNode
             }
-        }
+            else
+                console.log("Couldn't find source and/or target for " + src + ", " + tgt + "(" + srcNode + ", " + tgtNode + ")")
+        })
 
         let scale_link_stroke_width = d3.scaleLinear()
             .domain(d3.extent(data.links,function (d){return d.weight}))
